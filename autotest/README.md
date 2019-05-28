@@ -16,7 +16,7 @@ python get_20_newsgroups.py
 3. Please run the autotest script.
 ```bash
 # windows
-./ autotest.sh A B
+./autotest.sh A B
 # linux
 sh autotest.sh A B
 ```
