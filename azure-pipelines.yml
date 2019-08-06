@@ -5,6 +5,7 @@
 
 trigger:
 - master
+- chinese
 
 pool:
   vmImage: 'ubuntu-latest'
