@@ -5,6 +5,7 @@
 
 pr:
 - master
+- chinese
 
 pool:
   vmImage: 'ubuntu-latest'
