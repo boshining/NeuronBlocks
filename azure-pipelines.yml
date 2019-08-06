@@ -6,6 +6,7 @@
 trigger:
 - master
 - chinese
+- dev/zj
 
 pool:
   vmImage: 'ubuntu-latest'
