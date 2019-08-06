@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 import codecs
-import ujson as json
+import json
 import os
 import tempfile
 import random
@@ -10,10 +10,11 @@ import string
 import copy
 import torch
 import logging
+import shutil
 
 from losses.BaseLossConf import BaseLossConf
 #import traceback
-from settings import ProblemTypes, TaggingSchemes, SupportedMetrics, PredictionTypes, DefaultPredictionFields
+from settings import LanguageTypes, ProblemTypes, TaggingSchemes, SupportedMetrics, PredictionTypes, DefaultPredictionFields
 from utils.common_utils import log_set, prepare_dir
 from utils.exceptions import ConfigurationError
 import numpy as np
@@ -58,9 +59,10 @@ class ModelConf(object):
                 raise ConfigurationError("%s is not a legal JSON file, please check your JSON format!" % conf_path)
 
         self.tool_version = self.get_item(['tool_version'])
+        self.language = self.get_item(['language'], default='english').lower()
         self.problem_type = self.get_item(['inputs', 'dataset_type']).lower()
-        if ProblemTypes[self.problem_type] == ProblemTypes.sequence_tagging:
-            self.tagging_scheme = self.get_item(['inputs', 'tagging_scheme'], default=None, use_default=True)
+        #if ProblemTypes[self.problem_type] == ProblemTypes.sequence_tagging:
+        self.tagging_scheme = self.get_item(['inputs', 'tagging_scheme'], default=None, use_default=True)
 
         if self.mode == 'normal':
             self.use_cache = self.get_item(['inputs', 'use_cache'], True)
@@ -313,12 +315,19 @@ class ModelConf(object):
         else:
             self.batch_size_total = self.batch_size_each_gpu
 
+        self.cpu_num_workers = self.get_item(['training_params', 'cpu_num_workers'], default=-1)  #by default, use all workers cpu supports
 
         # text preprocessing
         self.__text_preprocessing = self.get_item(['training_params', 'text_preprocessing'], default=list())
         self.DBC2SBC = True if 'DBC2SBC' in self.__text_preprocessing else False
         self.unicode_fix = True if 'unicode_fix' in self.__text_preprocessing else False
         self.remove_stopwords = True if 'remove_stopwords' in self.__text_preprocessing else False
+
+        # tokenzier
+        if self.language == 'chinese':
+            self.tokenizer = self.get_item(['training_params', 'tokenizer'], default='jieba')
+        else:
+            self.tokenizer = self.get_item(['training_params', 'tokenizer'], default='nltk')
 
         if self.extra_feature:
             if self.DBC2SBC:
@@ -438,6 +447,10 @@ class ModelConf(object):
             assert self.predict_data_path is not None, "Please define predict_data_path"
             assert os.path.isfile(self.predict_data_path), "Training data %s does not exist!" % self.predict_data_path
 
+        # check language types
+        SUPPORTED_LANGUAGES = set(LanguageTypes._member_names_)
+        assert self.language in SUPPORTED_LANGUAGES, "Language type %s is not supported now. Supported types: %s" % (self.language, ",".join(SUPPORTED_LANGUAGES))
+
         # check problem types
         SUPPORTED_PROBLEMS = set(ProblemTypes._member_names_)
         assert self.problem_type in SUPPORTED_PROBLEMS, "Data type %s is not supported now. Supported types: %s" % (self.problem_type, ",".join(SUPPORTED_PROBLEMS))
@@ -507,3 +520,7 @@ class ModelConf(object):
         if not (nb_version_split[0] == conf_version_split[0] and nb_version_split[1] == conf_version_split[1]):
             raise ConfigurationError('The NeuronBlocks version is %s, but the configuration version is %s, please update your configuration to %s.%s.X' % (nb_version, conf_version, nb_version_split[0], nb_version_split[1]))
 
+    def back_up(self, params):
+        shutil.copy(params.conf_path, self.save_base_dir)
+        logging.info('Configuration file is backed up to %s' % (self.save_base_dir))
+        

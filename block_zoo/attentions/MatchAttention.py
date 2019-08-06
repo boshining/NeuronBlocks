@@ -19,7 +19,7 @@ class MatchAttentionConf(BaseConf):
 
     @DocInherit
     def default(self):
-        pass
+        self.activation = 'ReLU'
 
     @DocInherit
     def declare(self):
@@ -51,7 +51,10 @@ class MatchAttention(BaseLayer):
         super(MatchAttention, self).__init__(layer_conf)
         assert layer_conf.input_dims[0][-1] == layer_conf.input_dims[1][-1]
         self.linear = nn.Linear(layer_conf.input_dims[0][-1], layer_conf.input_dims[0][-1])
-        self.relu = nn.ReLU()
+        if layer_conf.activation:
+            self.activation = eval("nn." + self.layer_conf.activation)()
+        else:
+            self.activation = None
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x, x_len, y, y_len):
@@ -68,8 +71,11 @@ class MatchAttention(BaseLayer):
 
         """
 
-        x_proj = self.relu(self.linear(x))  # [batch_size, x_max_len, dim]
-        y_proj = self.relu(self.linear(y))  # [batch_size, y_max_len, dim]
+        x_proj = self.linear(x)  # [batch_size, x_max_len, dim]
+        y_proj = self.linear(y)  # [batch_size, y_max_len, dim]
+        if self.activation:
+            x_proj = self.activation(x_proj)
+            y_proj = self.activation(y_proj)
         scores = x_proj.bmm(y_proj.transpose(2, 1))     # [batch_size, x_max_len, y_max_len]
 
         # batch_size, y_max_len, _ = y.size()
